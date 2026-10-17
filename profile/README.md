@@ -50,7 +50,11 @@ eris-shared-infra ──► Cognito · S3 test cases · ECR (IDs published to SS
 <!-- TODO: add team members -->
 | Name | Role |
 |---|---|
-| | |
+| Chan Yong Liang| Backend Developer, Cloud Engineer|
+| Kok Jia Yin| Backend Developer, Cloud Engineer|
+| Chong Han Hui Isaac| Full Stack Developer|
+| Tan Po Hui| Full Stack Developer|
+| Low Tian Wei| Full Stack Developer|
 
 ---
 
