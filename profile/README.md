@@ -1,49 +1,32 @@
 # Eris
 
-**A real-time multiplayer coding game, built twice on AWS: once as a monolith, once as an event-driven serverless system.**
+**Eris** is a multiplayer competitive-programming game, built for the APU module *Designing and Developing Applications on the Cloud* (CT071-3-3-DDAC).
 
-Group project for **CT071-3-3-DDAC: Designing and Developing Applications on the Cloud** (Asia Pacific University).
+Up to 10 players share a 5×5 board of Python questions in a 60-minute match. The first player whose code the server records as Accepted claims that block, and claimed blocks stay taken. The player with the most blocks wins.
 
-## The game
+We build the same game twice on AWS and compare performance, scalability, availability and cost:
 
-- Up to **10 players** compete in a **60-minute** match on a **5×5 board** of programming questions.
-- Solve a question in **Python** to claim its block. The **earliest correct submission**, by server receive time, wins it.
-- Every submission is judged against 2 sample and 100 hidden test cases: `AC` · `WA` · `CE` · `RE` · `TLE`.
-- The player with the most blocks when time runs out wins.
-
-## Two architectures, one game
-
-The same game runs on two architectures. We compare them with CloudWatch metrics, X-Ray traces, load tests (k6, 500 concurrent players) and cost data.
-
-| | Monolithic | Event-driven serverless |
+| | Modular monolith | Event-driven serverless |
 |---|---|---|
-| Compute | One Fastify app on an EC2 Auto Scaling group behind an ALB + CloudFront | Lambda services (Player, Match, Submission, Realtime, Judge) |
-| Communication | In-process calls, BullMQ queue, Redis pub/sub | Amazon EventBridge bus, SQS, EventBridge Pipes |
-| Data | RDS PostgreSQL + ElastiCache Redis | *To be decided:* DynamoDB or RDS |
-| Real-time | WebSockets on the app servers | API Gateway WebSocket API |
-| Judge | Worker runs the judge container with `docker run` | Judge Lambda (same container image) in an isolated subnet |
+| Compute | One Fastify (TypeScript) image on EC2, run as three Auto Scaling groups: `api`, `ws` and `worker` | AWS Lambda per service around an Amazon EventBridge bus |
+| Data | Amazon RDS for PostgreSQL (Multi-AZ), Amazon ElastiCache for Redis | Amazon DynamoDB (one table per service) |
+| Messaging | Amazon SQS (judge jobs, results, drafts) | EventBridge + SQS, outbox via DynamoDB Streams and EventBridge Pipes |
+| Realtime | WebSocket tier + Redis pub/sub | API Gateway WebSocket API |
+| Judge | `docker run` of the judge image per job | Judge Lambda (container image) |
 
-Shared by both: Amazon Cognito, S3 for test cases, ECR for the judge image, AWS CDK for infrastructure. Region `us-east-1`.
+Both use Amazon Cognito, Amazon CloudFront and Amazon Route 53, and run the same judge image from Amazon ECR.
 
 ## Repositories
 
-| Repository | What it is | Stack |
-|---|---|---|
-| [`eris-core`](https://github.com/ddac-eris/eris-core) | Game rules shared by both architectures: claim rule, ranking, board, event types | TypeScript |
-| [`eris-judge`](https://github.com/ddac-eris/eris-judge) | Sandboxed Python judge; one container image for both architectures | Python 3.12, Docker |
-| [`eris-monolithic`](https://github.com/ddac-eris/eris-monolithic) | The monolithic app | TypeScript, Fastify, Prisma, BullMQ, CDK |
-| [`eris-serverless`](https://github.com/ddac-eris/eris-serverless) | The event-driven serverless app | TypeScript, Lambda, EventBridge, CDK |
-| [`eris-shared-infra`](https://github.com/ddac-eris/eris-shared-infra) | AWS resources both apps use: Cognito, S3 test cases, ECR | TypeScript, CDK |
+| Repo | What it is |
+|---|---|
+| [`eris-backend`](../../eris-backend) | npm workspaces monorepo: shared game rules (`packages/core`), the monolith (`apps/monolithic`), the serverless app (`apps/serverless`) and shared AWS CDK infrastructure (`infra/shared`) |
+| [`eris-judge`](../../eris-judge) | Python 3.12 judge: runs code against test cases in a sandbox and returns a verdict (AC/WA/CE/RE/TLE); used by both architectures |
+| [`eris-frontend`](../../eris-frontend) | Next.js frontend with the Monaco editor; the same build runs against both backends |
 
-```
-eris-shared-infra ──► Cognito · S3 test cases · ECR (IDs published to SSM)
-        │
-        ├──► eris-monolithic ──┐
-        └──► eris-serverless ──┤── both depend on eris-core (game rules)
-                               └── both run the eris-judge image
-```
+## Tech
 
-**Deploy order:** `eris-shared-infra` → push the `eris-judge` image → `eris-monolithic` / `eris-serverless`.
+TypeScript · Node.js 24 · Fastify · Prisma · Python 3.12 · AWS CDK · GitHub Actions
 
 ## Team
 
